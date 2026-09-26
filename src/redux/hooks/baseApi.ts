@@ -11,8 +11,6 @@ import {
 import Cookies from "js-cookie";
 import {
   clearAuthCookies,
-  missingUserMessage,
-  noteStaleAccount,
   readAccessToken,
   setAccessToken,
   setRefreshToken,
@@ -91,15 +89,6 @@ const baseQueryWithRefreshToken: BaseQueryFn<
     console.error("[API Error]", firstResult.error.status, firstResult.error.data);
   }
 
-  if (
-    firstResult.error?.status === 404 &&
-    requestUrl.includes("/users/me") &&
-    missingUserMessage(firstResult.error.data)
-  ) {
-    noteStaleAccount("This account was not found. Please sign in again.");
-    api.dispatch({ type: "auth/logOut" });
-    return firstResult;
-  }
   const isCredentialRequest =
     requestUrl.includes("/auth/login") ||
     requestUrl.includes("/auth/create-user");

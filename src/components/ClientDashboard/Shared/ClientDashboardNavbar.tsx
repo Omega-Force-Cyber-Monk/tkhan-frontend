@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import user from "@/assets/icons/user.svg";
+import user from "@/assets/Logo/usericon.svg";
 import { Link } from "react-router-dom";
 
 export interface NavbarProps {

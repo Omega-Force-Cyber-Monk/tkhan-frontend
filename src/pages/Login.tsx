@@ -69,12 +69,6 @@ const Login = () => {
   const user = useAppSelector(useCurrentUser);
 
   useEffect(() => {
-    const notice = sessionStorage.getItem("authNotice");
-    if (notice) {
-      sessionStorage.removeItem("authNotice");
-      toast.error(notice);
-      return;
-    }
     if (isAuthenticated && user && user.role === "ADMIN") {
       navigate("/admin-dashboard/dashboard", { replace: true });
     }
@@ -161,7 +155,7 @@ const Login = () => {
         <div className="hidden md:flex w-1/2 relative bg-linear-to-br from-[#FFF5F2] to-[#FFE8E0] items-center justify-center p-16">
           <img
             src={loginphoto}
-            alt="Karoo Admin"
+            alt="Karoot Admin"
             className="relative z-10 w-full max-w-sm drop-shadow-[0_20px_40px_rgba(242,101,34,0.2)]"
           />
         </div>
@@ -175,7 +169,7 @@ const Login = () => {
               </span>
             </div>
             <h2 className="text-3xl md:text-4xl font-black text-[#1A1A1A] leading-tight">
-              Welcome Back to <span className="text-[#F26522]">Karoo</span>
+              Welcome Back to <span className="text-[#F26522]">Karoot</span>
             </h2>
           </div>
 
@@ -285,7 +279,7 @@ const Login = () => {
       </div>
 
       <div className="absolute bottom-6 text-[10px] text-gray-300 font-bold tracking-widest uppercase">
-        Karoo Admin Framework v4.0.2
+        Karoot Admin Framework v4.0.2
       </div>
     </div>
   );

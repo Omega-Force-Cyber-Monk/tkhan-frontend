@@ -121,7 +121,7 @@ const AdminSidebar: React.FC<SidebarProps> = ({
         <Link to="/admin-dashboard/dashboard">
           <div className="flex flex-col items-start">
             <h1 className="text-[#FF6B35] text-[22px] sm:text-[25px] md:text-[28px] font-semibold tracking-tight leading-none">
-              Karoo
+              Karoot
             </h1>
 
             <p className="text-[11px] sm:text-[12px] md:text-[13px] font-semibold text-gray-700 mt-1 tracking-wider">
