@@ -183,20 +183,11 @@ const StatsCards: React.FC = () => {
             </motion.p>
           </div>
 
-          <motion.div
+          <div
             className={`p-2.5 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl ${item.bg} ${item.color} relative z-10`}
-            whileHover={{
-              rotate: [0, -15, 15, -10, 10, 0],
-              scale: 1.1,
-            }}
-            transition={{ duration: 0.5 }}
-            animate={{
-              scale: [1, 1.05, 1],
-              transition: { duration: 2, repeat: Infinity, repeatDelay: 3 },
-            }}
           >
             {item.icon}
-          </motion.div>
+          </div>
 
           <motion.div
             className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r ${item.countColor.replace(

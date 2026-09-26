@@ -110,23 +110,12 @@ const StatsCardComponent: React.FC<StatsCardProps> = ({
         )}
       </div>
 
-      <motion.div
-        whileHover={{
-          rotate: [0, -15, 15, -10, 10, 0],
-          scale: 1.1,
-        }}
-        transition={{ duration: 0.6 }}
-        animate={{
-          scale: [1, 1.05, 1],
-          transition: { duration: 2, repeat: Infinity, repeatDelay: 5 },
-        }}
-        className="p-2 sm:p-2.5 md:p-3 lg:p-4 rounded-xl sm:rounded-2xl flex items-center justify-center bg-[#FFF4EF] text-[#FF6B35] shrink-0 ml-3 sm:ml-4 group-hover:bg-[#FF6B35] group-hover:text-white transition-all duration-300"
-      >
+      <div className="p-2 sm:p-2.5 md:p-3 lg:p-4 rounded-xl sm:rounded-2xl flex items-center justify-center bg-[#FFF4EF] text-[#FF6B35] shrink-0 ml-3 sm:ml-4 group-hover:bg-[#FF6B35] group-hover:text-white transition-colors duration-300">
         <Icon
           className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 lg:w-6 lg:h-6"
           strokeWidth={2.5}
         />
-      </motion.div>
+      </div>
 
       <motion.div
         className="absolute -bottom-2 -right-2 w-20 h-20 sm:w-24 sm:h-24 bg-[#FF6B35]/5 rounded-full blur-2xl"
