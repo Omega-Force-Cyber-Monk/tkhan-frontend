@@ -9,6 +9,14 @@ import {
   QueryReturnValue,
 } from "@reduxjs/toolkit/query/react";
 import Cookies from "js-cookie";
+import {
+  clearAuthCookies,
+  missingUserMessage,
+  noteStaleAccount,
+  readAccessToken,
+  setAccessToken,
+  setRefreshToken,
+} from "@/utils/authCookies";
 
 interface RefreshResponse {
   data: {
@@ -46,8 +54,9 @@ const FORM_DATA_ENDPOINTS = ["createCategory", "updateCategory"];
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: baseURL,
   credentials: "include",
-  prepareHeaders: (headers, { endpoint }) => {
-    const token = Cookies.get("token");
+  prepareHeaders: (headers, { endpoint, getState }) => {
+    const state = getState() as { auth?: { token?: string | null } };
+    const token = readAccessToken(state.auth?.token);
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
     }
@@ -76,18 +85,33 @@ const baseQueryWithRefreshToken: BaseQueryFn<
   }
 
   const firstResult = await rawBaseQuery(args, api, extraOptions);
+  const requestUrl = typeof args === "string" ? args : (args.url ?? "");
 
   if (isDev && firstResult.error) {
     console.error("[API Error]", firstResult.error.status, firstResult.error.data);
   }
 
-  if (firstResult.error?.status !== 401) return firstResult;
+  if (
+    firstResult.error?.status === 404 &&
+    requestUrl.includes("/users/me") &&
+    missingUserMessage(firstResult.error.data)
+  ) {
+    noteStaleAccount("This account was not found. Please sign in again.");
+    api.dispatch({ type: "auth/logOut" });
+    return firstResult;
+  }
+  const isCredentialRequest =
+    requestUrl.includes("/auth/login") ||
+    requestUrl.includes("/auth/create-user");
+
+  if (firstResult.error?.status !== 401 || isCredentialRequest) {
+    return firstResult;
+  }
 
   const refreshToken = Cookies.get("refreshToken");
 
   if (!refreshToken) {
-    Cookies.remove("token");
-    Cookies.remove("refreshToken");
+    clearAuthCookies();
     return firstResult;
   }
 
@@ -131,8 +155,7 @@ const baseQueryWithRefreshToken: BaseQueryFn<
     if (!refreshResult.data) {
       const error = refreshResult.error as FetchBaseQueryError;
       processQueue(error, null);
-      Cookies.remove("token");
-      Cookies.remove("refreshToken");
+      clearAuthCookies();
       return firstResult;
     }
 
@@ -144,18 +167,10 @@ const baseQueryWithRefreshToken: BaseQueryFn<
       throw new Error("No access token in refresh response");
     }
 
-    Cookies.set("token", newAccessToken, {
-      expires: 7,
-      secure: true,
-      sameSite: "lax",
-    });
+    setAccessToken(newAccessToken);
 
     if (newRefreshToken) {
-      Cookies.set("refreshToken", newRefreshToken, {
-        expires: 30,
-        secure: true,
-        sameSite: "lax",
-      });
+      setRefreshToken(newRefreshToken);
     }
 
     processQueue(null, newAccessToken);
@@ -181,8 +196,7 @@ const baseQueryWithRefreshToken: BaseQueryFn<
     return await rawBaseQuery(retryArgs, api, extraOptions);
   } catch (error) {
     processQueue(error as Error, null);
-    Cookies.remove("token");
-    Cookies.remove("refreshToken");
+    clearAuthCookies();
     return firstResult;
   } finally {
     isRefreshing = false;

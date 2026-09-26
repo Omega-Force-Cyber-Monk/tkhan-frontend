@@ -7,7 +7,7 @@ import {
   useCurrentUser,
   useIsAuthenticated,
 } from "@/redux/features/auth/authSlice";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { useAppSelector } from "@/redux/hooks/redux-hook";
 import { SerializedError } from "@reduxjs/toolkit";
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
@@ -18,11 +18,11 @@ interface ApiErrorResponse {
   path?: string;
   timestamp?: string;
   error?: {
-    message: string;
+    message?: string;
     error?: string;
     statusCode?: number;
   };
-  message?: string;
+  message?: string | string[];
 }
 
 function isFetchBaseQueryError(error: unknown): error is FetchBaseQueryError {
@@ -37,6 +37,27 @@ function isApiErrorResponse(data: unknown): data is ApiErrorResponse {
   );
 }
 
+function readMessage(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (Array.isArray(value)) {
+    const parts = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+    if (parts.length) return parts.join(", ");
+  }
+  return null;
+}
+
+const showLoginError = (reason: string) => {
+  toast.error("Login failed", {
+    description: reason,
+    duration: 6000,
+    style: {
+      background: "#FEF2F2",
+      color: "#991B1B",
+      border: "1px solid #FECACA",
+    },
+  });
+};
+
 const Login = () => {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -48,29 +69,54 @@ const Login = () => {
   const user = useAppSelector(useCurrentUser);
 
   useEffect(() => {
+    const notice = sessionStorage.getItem("authNotice");
+    if (notice) {
+      sessionStorage.removeItem("authNotice");
+      toast.error(notice);
+      return;
+    }
     if (isAuthenticated && user && user.role === "ADMIN") {
-      navigate("/admin-dashboard", { replace: true });
+      navigate("/admin-dashboard/dashboard", { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
 
   const getErrorMessage = (error: unknown): string => {
     if (isFetchBaseQueryError(error)) {
       const data = error.data;
+
       if (isApiErrorResponse(data)) {
-        if (data.error?.message) return data.error.message;
-        if (data.message) return data.message;
+        const nested = readMessage(data.error?.message);
+        if (nested) return nested;
+        const top = readMessage(data.message);
+        if (top) return top;
+        const statusText = readMessage(data.error?.error);
+        if (statusText) return statusText;
       }
-      if (typeof data === "string") return data;
-      if (error.status === 401) return "Invalid email or password!";
-      return "Server error. Please try again later.";
+
+      const raw = readMessage(data);
+      if (raw) return raw;
+
+      if (error.status === 401) return "Invalid email or password.";
+      if (error.status === "FETCH_ERROR") {
+        return "Could not reach the server. Check your connection and try again.";
+      }
+      if (error.status === "TIMEOUT_ERROR") {
+        return "The server took too long to respond. Please try again.";
+      }
+      if (typeof error.status === "number" && error.status >= 500) {
+        return "Server error. Please try again later.";
+      }
+      return "Login could not be completed. Please try again.";
     }
 
     if (error && typeof error === "object" && "message" in error) {
       const serializedError = error as SerializedError;
-      if (serializedError.message) return serializedError.message;
+      const message = readMessage(serializedError.message);
+      if (message) return message;
     }
 
-    if (typeof error === "string") return error;
+    const plain = readMessage(error);
+    if (plain) return plain;
 
     return "An unexpected error occurred. Please try again.";
   };
@@ -79,11 +125,11 @@ const Login = () => {
     e.preventDefault();
 
     if (!email.trim()) {
-      toast.error("Please enter your email");
+      showLoginError("Please enter your email.");
       return;
     }
     if (!password.trim()) {
-      toast.error("Please enter your password");
+      showLoginError("Please enter your password.");
       return;
     }
 
@@ -92,18 +138,17 @@ const Login = () => {
 
       if (result.success && result.data) {
         if (result.data.user.role !== "ADMIN") {
-          toast.error("Access denied! Admin privileges required.");
+          showLoginError("Access denied. Admin privileges required.");
           return;
         }
 
         toast.success(`Welcome back, ${result.data.user.fullName || "Admin"}!`);
       } else {
-        toast.error("Invalid email or password!");
+        showLoginError("Invalid email or password.");
       }
     } catch (error: unknown) {
       console.error("Login Error:", error);
-      const errorMessage = getErrorMessage(error);
-      toast.error(errorMessage);
+      showLoginError(getErrorMessage(error));
     }
   };
 

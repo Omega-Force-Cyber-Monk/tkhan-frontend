@@ -1,9 +1,11 @@
 
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, current, PayloadAction } from "@reduxjs/toolkit";
 import Cookies from "js-cookie";
+import { clearAuthCookies, setAuthCookies } from "@/utils/authCookies";
 import { authApi } from "./authApi";
 import { AppRootState } from "@/redux/store";
 import { LoginResponse, TAuth } from "./ auth.type";
+import { readSavedProfileImage } from "@/utils/adminProfilePic";
 
 
 const initialState: TAuth = {
@@ -14,16 +16,23 @@ const initialState: TAuth = {
 
 
 const clearAuthStorage = () => {
-  Cookies.remove("token");
-  Cookies.remove("refreshToken");
+  clearAuthCookies();
   localStorage.removeItem("user");
-  localStorage.removeItem("adminProfilePic");
+  localStorage.removeItem("persist:auth");
 };
 
 const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
+    setProfileImage: (state, { payload }: PayloadAction<string>) => {
+      if (!state.user) return;
+      state.user.profileImage = payload;
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ ...current(state.user), profileImage: payload }),
+      );
+    },
     logOut: (state) => {
       state.user = null;
       state.token = null;
@@ -64,20 +73,16 @@ const authSlice = createSlice({
             console.error("Access denied: Admin role required");
             return;
           }
-          state.user = payload.data.user;
+          const savedProfileImage = readSavedProfileImage(payload.data.user.id);
+          const user = {
+            ...payload.data.user,
+            profileImage: savedProfileImage || payload.data.user.profileImage,
+          };
+          state.user = user;
           state.token = payload.data.accessToken;
           state.refreshToken = payload.data.refreshToken;
-          Cookies.set("token", payload.data.accessToken, {
-            expires: 7,
-            secure: true,
-            sameSite: "strict",
-          });
-          Cookies.set("refreshToken", payload.data.refreshToken, {
-            expires: 30,
-            secure: true,
-            sameSite: "strict",
-          });
-          localStorage.setItem("user", JSON.stringify(payload.data.user));
+          setAuthCookies(payload.data.accessToken, payload.data.refreshToken);
+          localStorage.setItem("user", JSON.stringify(user));
         }
       }
     );
@@ -91,7 +96,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { logOut, loadUserFromStorage } = authSlice.actions;
+export const { logOut, loadUserFromStorage, setProfileImage } = authSlice.actions;
 export default authSlice.reducer;
 
 export const useCurrentToken = (state: AppRootState) => state.auth.token;

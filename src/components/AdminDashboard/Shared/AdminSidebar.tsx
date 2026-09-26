@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   LayoutGrid,
   Users,
@@ -10,6 +10,13 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, Variants } from "framer-motion";
+import { useCurrentUser } from "@/redux/features/auth/authSlice";
+import { useGetMeQuery } from "@/redux/features/users/usersApi";
+import { useAppSelector } from "@/redux/hooks/redux-hook";
+import {
+  PROFILE_PIC_UPDATED,
+  readSavedProfileImage,
+} from "@/utils/adminProfilePic";
 
 export interface SidebarItem {
   icon: LucideIcon;
@@ -64,6 +71,29 @@ const AdminSidebar: React.FC<SidebarProps> = ({
   userEmail = "admin@platform.com",
 }) => {
   const location = useLocation();
+  const user = useAppSelector(useCurrentUser);
+  const { data: meResponse } = useGetMeQuery();
+  const me = meResponse?.data;
+  const displayName = me?.fullName || user?.fullName || userName;
+  const displayEmail = me?.email || user?.email || userEmail;
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onUpdate = (event: Event) => {
+      const nextPic = (event as CustomEvent<string>).detail;
+      if (nextPic?.startsWith("http")) setUploadedImage(nextPic);
+    };
+
+    window.addEventListener(PROFILE_PIC_UPDATED, onUpdate);
+    return () => window.removeEventListener(PROFILE_PIC_UPDATED, onUpdate);
+  }, []);
+
+  const avatar =
+    uploadedImage ||
+    readSavedProfileImage(me?.id || user?.id) ||
+    me?.profileImage ||
+    (user?.profileImage?.startsWith("http") ? user.profileImage : null) ||
+    userImage;
 
   const sidebarVariants: Variants = {
     hidden: { opacity: 0, x: -15 },
@@ -103,7 +133,10 @@ const AdminSidebar: React.FC<SidebarProps> = ({
 
       <nav className="flex-1 px-2 sm:px-3 md:px-4 space-y-1">
         {sidebarItems.map((item) => {
-          const isActive = location.pathname === item.href;
+          const isActive =
+            location.pathname === item.href ||
+            (item.href === "/admin-dashboard/dashboard" &&
+              location.pathname === "/admin-dashboard");
 
           const Icon = item.icon;
 
@@ -155,24 +188,24 @@ const AdminSidebar: React.FC<SidebarProps> = ({
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-2 sm:gap-3 bg-gray-50/50 p-3 sm:p-4 rounded-2xl">
             <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-[#FF6B35]/10 flex items-center justify-center text-[#FF6B35] text-sm sm:text-base font-bold overflow-hidden border border-[#FF6B35]/20 shrink-0">
-              {userImage ? (
+              {avatar ? (
                 <img
-                  src={userImage}
-                  alt={userName}
+                  src={avatar}
+                  alt={displayName}
                   className="w-full h-full object-cover"
                 />
               ) : (
-                userName.charAt(0)
+                displayName.charAt(0)
               )}
             </div>
 
             <div className="overflow-hidden text-left">
               <p className="text-[12px] sm:text-[13px] md:text-sm font-medium text-gray-800 truncate">
-                {userName}
+                {displayName}
               </p>
 
               <p className="text-[10px] sm:text-[10.5px] md:text-[11px] text-gray-400 truncate">
-                {userEmail}
+                {displayEmail}
               </p>
             </div>
           </div>

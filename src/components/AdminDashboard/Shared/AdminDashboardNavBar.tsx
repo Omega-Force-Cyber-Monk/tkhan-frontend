@@ -12,7 +12,11 @@ import {
 import { Button } from "@/components/ui/button";
 import userIcon from "@/assets/icons/user.svg";
 import { useDispatch } from "react-redux";
-import { logOut } from "@/redux/features/auth/authSlice";
+import { logOut, setProfileImage, useCurrentUser } from "@/redux/features/auth/authSlice";
+import { useAppSelector } from "@/redux/hooks/redux-hook";
+import { useGetMeQuery, useUpdateProfileImageMutation } from "@/redux/features/users/usersApi";
+import { readSavedProfileImage, saveAdminProfilePic } from "@/utils/adminProfilePic";
+import { toast } from "sonner";
 import {
   useGetNotificationsQuery,
   useMarkAllNotificationsReadMutation,
@@ -40,6 +44,64 @@ const getTimeAgo = (dateStr: string): string => {
   return "Just now";
 };
 
+const DIRECT_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+]);
+
+const toProfileImageFile = async (file: File): Promise<File> => {
+  const isSvg = file.name.toLowerCase().endsWith(".svg");
+  if (DIRECT_IMAGE_TYPES.has(file.type) || isSvg) return file;
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error("Please choose a JPG, PNG, or SVG image.");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    bitmap.close();
+    throw new Error("Please choose a JPG, PNG, or SVG image.");
+  }
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/png");
+  });
+  if (!blob) throw new Error("Please choose a JPG, PNG, or SVG image.");
+  return new File([blob], "profile.png", { type: "image/png" });
+};
+
+const getUploadError = (error: unknown): string => {
+  if (typeof error === "object" && error !== null && "data" in error) {
+    const data = (error as {
+      data?: { message?: string | string[]; error?: { message?: string } } | string;
+    }).data;
+    if (typeof data === "string" && data.trim()) return data;
+    if (data && typeof data === "object") {
+      const message = data.error?.message || (Array.isArray(data.message) ? data.message.join(", ") : data.message);
+      if (message === "Only image files are allowed") {
+        return "Please choose a JPG, PNG, or SVG image.";
+      }
+      if (message === "Internal server error") {
+        return "The server couldn't save this image. Try a smaller JPG or PNG.";
+      }
+      if (message) return message;
+    }
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return "Could not update profile picture.";
+};
+
 const getNotificationIcon = (type: string) => {
   switch (type) {
     case "BOOKING_ACCEPTED":
@@ -52,57 +114,12 @@ const getNotificationIcon = (type: string) => {
   }
 };
 
-const openImageDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open("AdminDashboardDB", 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains("settings")) {
-        db.createObjectStore("settings");
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-const saveImageToDB = async (key: string, value: string): Promise<void> => {
-  try {
-    const db = await openImageDB();
-    const tx = db.transaction("settings", "readwrite");
-    const store = tx.objectStore("settings");
-    store.put(value, key);
-    return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  } catch (err) {
-    console.error("IndexedDB Save Error:", err);
-  }
-};
-
-const getImageFromDB = async (key: string): Promise<string | null> => {
-  try {
-    const db = await openImageDB();
-    const tx = db.transaction("settings", "readonly");
-    const store = tx.objectStore("settings");
-    const request = store.get(key);
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
-  } catch (err) {
-    console.error("IndexedDB Get Error:", err);
-    return null;
-  }
-};
-// -------------------------
-
 const AdminDashboardNavBar: React.FC<NavbarProps> = ({
   onMobileMenuToggle,
   userName = "Admin",
 }) => {
   const dispatch = useDispatch();
+  const user = useAppSelector(useCurrentUser);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -121,22 +138,24 @@ const AdminDashboardNavBar: React.FC<NavbarProps> = ({
   const [markAllRead, { isLoading: isMarkingAll }] =
     useMarkAllNotificationsReadMutation();
   const [markRead] = useMarkNotificationReadMutation();
+  const [updateProfileImage, { isLoading: isUploadingPic }] =
+    useUpdateProfileImageMutation();
+  const { data: meResponse } = useGetMeQuery();
+  const me = meResponse?.data;
+  const displayName = me?.fullName || user?.fullName || userName;
+  const displayEmail = me?.email || user?.email || "";
+  const savedImage = readSavedProfileImage(me?.id || user?.id);
+  const accountImage =
+    savedImage ||
+    me?.profileImage ||
+    (user?.profileImage?.startsWith("http") ? user.profileImage : null);
+  const profileSrc = profilePic.startsWith("blob:") ? profilePic : accountImage || userIcon;
 
   useEffect(() => {
-    const loadSavedPic = async () => {
-      const savedPic = await getImageFromDB("adminProfilePic");
-      if (savedPic) {
-        setProfilePic(savedPic);
-      } else {
-        const legacySaved = localStorage.getItem("adminProfilePic");
-        if (legacySaved) {
-          setProfilePic(legacySaved);
-          await saveImageToDB("adminProfilePic", legacySaved);
-        }
-      }
-    };
-    loadSavedPic();
-  }, []);
+    if (savedImage || !me?.profileImage) return;
+    dispatch(setProfileImage(me.profileImage));
+    void saveAdminProfilePic(me.id, me.profileImage);
+  }, [dispatch, me?.id, me?.profileImage, savedImage]);
 
   const {
     data: page1Data,
@@ -332,17 +351,33 @@ const AdminDashboardNavBar: React.FC<NavbarProps> = ({
     }
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      setProfilePic(base64);
-      localStorage.setItem("adminProfilePic", base64);
-      await saveImageToDB("adminProfilePic", base64);
-    };
-    reader.readAsDataURL(file);
+    event.target.value = "";
+    if (!file || isUploadingPic) return;
+
+    const previousPic = profilePic;
+    const previewUrl = URL.createObjectURL(file);
+    setProfilePic(previewUrl);
+
+    try {
+      const uploadFile = await toProfileImageFile(file);
+      const result = await updateProfileImage(uploadFile).unwrap();
+      const imageUrl = result.data?.profileImage;
+      if (!imageUrl) {
+        throw new Error("Profile image URL was not returned.");
+      }
+
+      setProfilePic(imageUrl);
+      dispatch(setProfileImage(imageUrl));
+      await saveAdminProfilePic(user?.id, imageUrl);
+      toast.success("Profile picture updated");
+    } catch (error: unknown) {
+      setProfilePic(previousPic);
+      toast.error(getUploadError(error));
+    } finally {
+      URL.revokeObjectURL(previewUrl);
+    }
   };
 
   return (
@@ -504,12 +539,17 @@ const AdminDashboardNavBar: React.FC<NavbarProps> = ({
                 }}
                 className="relative group cursor-pointer outline-none rounded-full"
               >
-                <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-full border-2 border-white shadow-md overflow-hidden bg-gray-50">
+                <div className="relative w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-full border-2 border-white shadow-md overflow-hidden bg-gray-50">
                   <img
-                    src={profilePic}
+                    src={profileSrc}
                     alt="User"
                     className="w-full h-full object-cover"
                   />
+                  {isUploadingPic && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <Loader2 size={16} className="animate-spin text-white" />
+                    </span>
+                  )}
                 </div>
               </button>
 
@@ -517,11 +557,12 @@ const AdminDashboardNavBar: React.FC<NavbarProps> = ({
                 <div className="absolute right-0 top-full mt-2 z-50 bg-[#FF6B35] text-white w-56 shadow-2xl rounded-2xl border border-white/20 p-2">
                   <button
                     type="button"
+                    disabled={isUploadingPic}
                     onClick={() => {
                       fileInputRef.current?.click();
                       setIsProfileOpen(false);
                     }}
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left hover:bg-white hover:text-[#FF6B35] transition-all cursor-pointer mb-1"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left hover:bg-white hover:text-[#FF6B35] transition-all cursor-pointer mb-1 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <ImagePlus size={18} />
                     <span className="font-medium">Set your picture</span>
@@ -541,10 +582,10 @@ const AdminDashboardNavBar: React.FC<NavbarProps> = ({
 
             <div className="block text-left">
               <p className="font-semibold text-[12px] sm:text-[13px] md:text-[15px] text-[#FF6B35] leading-none mb-1">
-                {userName}
+                {displayName}
               </p>
               <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-400 font-medium leading-none">
-                admin@platform.com
+                {displayEmail}
               </p>
             </div>
           </div>
@@ -554,7 +595,7 @@ const AdminDashboardNavBar: React.FC<NavbarProps> = ({
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
-          accept="image/*"
+          accept="image/*,.svg"
           className="hidden"
         />
       </header>

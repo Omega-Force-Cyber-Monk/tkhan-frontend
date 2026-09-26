@@ -119,6 +119,46 @@ export interface BlockUserResponse {
     data: Partial<User>;
 }
 
+export interface CurrentUserProfile {
+    id: string;
+    fullName: string;
+    phone: string;
+    sharePhoneWithBookingPartners: boolean;
+    email: string;
+    profileImage: string | null;
+    streetAddress: string | null;
+    unitSuite: string | null;
+    city: string | null;
+    province: string | null;
+    postalCode: string | null;
+    role: string;
+    emailVerified: boolean;
+    emailVerificationExpiresAt: string | null;
+    status: string;
+    isBlocked: boolean;
+    passwordResetExpiresAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+    buyerProfile: unknown | null;
+    groomerProfile: unknown | null;
+}
+
+export interface CurrentUserResponse {
+    success: boolean;
+    data: CurrentUserProfile;
+}
+
+export interface UpdateProfileImageResponse {
+    success: boolean;
+    data: {
+        id: string;
+        fullName: string;
+        email: string;
+        profileImage: string | null;
+        role: string;
+    };
+}
+
 export interface GetUsersParams {
     page?: number;
     limit?: number;
