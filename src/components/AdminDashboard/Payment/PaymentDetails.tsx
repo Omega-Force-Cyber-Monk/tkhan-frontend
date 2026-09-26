@@ -5,6 +5,10 @@ import { Payment } from "../../../redux/features/payment/paymentTypes";
 interface PaymentDetailsProps {
   onBack: () => void;
   data: Payment | null;
+  onAcceptCompletion?: (bookingId: string) => void;
+  onRejectCompletion?: (bookingId: string) => void;
+  actingId?: string | null;
+  showCompletionActions?: boolean;
 }
 
 type PaymentStatus = "SUCCEEDED" | "PENDING" | "FAILED" | "REFUNDED";
@@ -31,6 +35,10 @@ const convertToNumber = (value: string | number | undefined): number => {
 export const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   onBack,
   data,
+  onAcceptCompletion,
+  onRejectCompletion,
+  actingId,
+  showCompletionActions = false,
 }) => {
   if (!data) {
     return (
@@ -146,6 +154,70 @@ export const PaymentDetails: React.FC<PaymentDetailsProps> = ({
               </div>
             </div>
           </div>
+
+          {(booking?.beforeImage ||
+            booking?.afterImage ||
+            booking?.completionNote) && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-[11px] text-[#9CA3AF] mb-1">
+                  Completion note
+                </p>
+                <p className="text-[13px] text-[#111827]">
+                  {booking?.completionNote || "No note provided."}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] text-[#9CA3AF] mb-1.5">Before</p>
+                  {booking?.beforeImage ? (
+                    <img
+                      src={booking.beforeImage}
+                      alt="Before"
+                      className="w-full h-36 object-cover rounded-xl border border-[#F3F4F6]"
+                    />
+                  ) : (
+                    <div className="w-full h-36 rounded-xl bg-[#F9FAFB] border border-dashed border-[#E5E7EB] text-[#9CA3AF] text-xs flex items-center justify-center">
+                      No before photo
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[11px] text-[#9CA3AF] mb-1.5">After</p>
+                  {booking?.afterImage ? (
+                    <img
+                      src={booking.afterImage}
+                      alt="After"
+                      className="w-full h-36 object-cover rounded-xl border border-[#F3F4F6]"
+                    />
+                  ) : (
+                    <div className="w-full h-36 rounded-xl bg-[#F9FAFB] border border-dashed border-[#E5E7EB] text-[#9CA3AF] text-xs flex items-center justify-center">
+                      No after photo
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showCompletionActions && booking && (
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={() => onAcceptCompletion?.(booking.id)}
+                disabled={actingId === booking.id}
+                className="px-4 py-2 rounded-lg bg-green-600 text-white text-[13px] font-medium hover:bg-green-700 disabled:opacity-50 cursor-pointer"
+              >
+                {actingId === booking.id ? "Saving..." : "Accept completion"}
+              </button>
+              <button
+                onClick={() => onRejectCompletion?.(booking.id)}
+                disabled={actingId === booking.id}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white text-[13px] font-medium hover:bg-red-700 disabled:opacity-50 cursor-pointer"
+              >
+                Reject completion
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>

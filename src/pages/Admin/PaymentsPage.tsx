@@ -1,18 +1,27 @@
-// src/pages/AdminDashboard/PaymentsPage.tsx
-
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Toaster } from "react-hot-toast";
+import { toast } from "sonner";
 
 import { PaymentHistoryTable } from "../../components/AdminDashboard/Payment/PaymentHistoryTable";
 import { PaymentDetails } from "../../components/AdminDashboard/Payment/PaymentDetails";
 import { PlatformPricingTab } from "../../components/AdminDashboard/Payment/PlatformPricing";
+import { PendingPaymentsTable } from "../../components/AdminDashboard/Payment/PendingPaymentsTable";
+import CompletionRejectModal from "../../components/AdminDashboard/Shared/CompletionRejectModal";
 
 import { Payment } from "../../redux/features/payment/paymentTypes";
+import {
+  useApproveCompletionMutation,
+  useRejectBookingMutation,
+} from "../../redux/features/booking/bookingApi";
 
-type View = "LIST_HISTORY" | "DETAIL_HISTORY" | "PLATFORM_PRICING";
+type View =
+  | "LIST_PENDING"
+  | "DETAIL_PENDING"
+  | "LIST_HISTORY"
+  | "DETAIL_HISTORY"
+  | "PLATFORM_PRICING";
 
-type ActiveTab = "history" | "pricing";
+type ActiveTab = "pending" | "history" | "pricing";
 
 const getAnimationVariants = (isDetailView: boolean) => ({
   initial: isDetailView ? { opacity: 0, x: 20 } : { opacity: 0 },
@@ -21,27 +30,71 @@ const getAnimationVariants = (isDetailView: boolean) => ({
 });
 
 const TABS: { key: ActiveTab; label: string; listView: View }[] = [
+  { key: "pending", label: "Pending payments", listView: "LIST_PENDING" },
   { key: "history", label: "Payment History", listView: "LIST_HISTORY" },
   { key: "pricing", label: "Platform Pricing", listView: "PLATFORM_PRICING" },
 ];
 
-export default function PaymentsPage() {
-  const [view, setView] = useState<View>("LIST_HISTORY");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("history");
-  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+const getErrorMessage = (error: unknown) => {
+  const err = error as {
+    data?: { message?: string; error?: { message?: string } };
+  };
+  return (
+    err?.data?.error?.message ||
+    err?.data?.message ||
+    "Something went wrong. Please try again."
+  );
+};
 
-  const isDetailView = view === "DETAIL_HISTORY";
+export default function PaymentsPage() {
+  const [view, setView] = useState<View>("LIST_PENDING");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("pending");
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [rejectId, setRejectId] = useState<string | null>(null);
+  const [actingBookingId, setActingBookingId] = useState<string | null>(null);
+
+  const [approveCompletion] = useApproveCompletionMutation();
+  const [rejectBooking, { isLoading: isRejecting }] =
+    useRejectBookingMutation();
+
+  const isDetailView = view === "DETAIL_HISTORY" || view === "DETAIL_PENDING";
   const isListView = !isDetailView;
   const variants = getAnimationVariants(isDetailView);
+  const completionActingId = actingBookingId;
 
-  const handleViewPaymentDetails = (payment: Payment): void => {
-    setSelectedPayment(payment);
-    setView("DETAIL_HISTORY");
+  const handleAccept = async (bookingId: string) => {
+    setActingBookingId(bookingId);
+    try {
+      await approveCompletion(bookingId).unwrap();
+      toast.success("Completion accepted");
+      if (view === "DETAIL_PENDING") {
+        setView("LIST_PENDING");
+        setSelectedPayment(null);
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setActingBookingId(null);
+    }
   };
 
-  const handleBackFromPaymentDetail = (): void => {
-    setView("LIST_HISTORY");
-    setSelectedPayment(null);
+  const handleRejectConfirm = async (reason: string) => {
+    if (!rejectId) return;
+    setActingBookingId(rejectId);
+    try {
+      await rejectBooking({ id: rejectId, reason }).unwrap();
+      toast.success("Completion rejected");
+      setRejectId(null);
+      if (view === "DETAIL_PENDING") {
+        setView("LIST_PENDING");
+        setSelectedPayment(null);
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+      throw error;
+    } finally {
+      setActingBookingId(null);
+    }
   };
 
   const handleTabClick = (tab: { key: ActiveTab; listView: View }): void => {
@@ -52,8 +105,6 @@ export default function PaymentsPage() {
 
   return (
     <div className="w-full bg-gray-50 font-['Inter']">
-      <Toaster position="top-right" />
-
       {isListView && (
         <div className="mb-6 md:mb-10">
           <h1 className="text-xl md:text-2xl font-bold text-[#1E293B] tracking-tight">
@@ -101,9 +152,21 @@ export default function PaymentsPage() {
           >
             {isListView && (
               <>
+                {view === "LIST_PENDING" && (
+                  <PendingPaymentsTable
+                    onViewDetails={(payment) => {
+                      setSelectedPayment(payment);
+                      setView("DETAIL_PENDING");
+                    }}
+                  />
+                )}
+
                 {view === "LIST_HISTORY" && (
                   <PaymentHistoryTable
-                    onViewDetails={handleViewPaymentDetails}
+                    onViewDetails={(payment) => {
+                      setSelectedPayment(payment);
+                      setView("DETAIL_HISTORY");
+                    }}
                   />
                 )}
 
@@ -113,13 +176,37 @@ export default function PaymentsPage() {
 
             {view === "DETAIL_HISTORY" && (
               <PaymentDetails
-                onBack={handleBackFromPaymentDetail}
+                onBack={() => {
+                  setView("LIST_HISTORY");
+                  setSelectedPayment(null);
+                }}
                 data={selectedPayment}
+              />
+            )}
+
+            {view === "DETAIL_PENDING" && (
+              <PaymentDetails
+                onBack={() => {
+                  setView("LIST_PENDING");
+                  setSelectedPayment(null);
+                }}
+                data={selectedPayment}
+                showCompletionActions
+                onAcceptCompletion={handleAccept}
+                onRejectCompletion={(bookingId) => setRejectId(bookingId)}
+                actingId={completionActingId}
               />
             )}
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <CompletionRejectModal
+        isOpen={Boolean(rejectId)}
+        onClose={() => setRejectId(null)}
+        onConfirm={handleRejectConfirm}
+        isLoading={isRejecting}
+      />
     </div>
   );
 }
