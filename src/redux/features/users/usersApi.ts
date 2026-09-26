@@ -2,7 +2,7 @@
 
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { baseApi } from "@/redux/hooks/baseApi";
-import { missingUserMessage, noteStaleAccount, readAccessToken } from "@/utils/authCookies";
+import { readAccessToken } from "@/utils/authCookies";
 import {
     UsersListResponse,
     UserDetailsResponse,
@@ -126,10 +126,6 @@ export const usersApi = baseApi.injectEndpoints({
 
                     const data = await response.json().catch(() => null);
                     if (!response.ok) {
-                        if (response.status === 404 && missingUserMessage(data)) {
-                            noteStaleAccount("This account was not found. Please sign in again.");
-                            api.dispatch({ type: "auth/logOut" });
-                        }
                         return {
                             error: {
                                 status: response.status,

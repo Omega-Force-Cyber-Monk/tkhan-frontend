@@ -10,7 +10,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import userIcon from "@/assets/icons/user.svg";
+import userIcon from "@/assets/Logo/usericon.svg";
 import { useDispatch } from "react-redux";
 import { logOut, setProfileImage, useCurrentUser } from "@/redux/features/auth/authSlice";
 import { useAppSelector } from "@/redux/hooks/redux-hook";

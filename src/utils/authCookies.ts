@@ -37,18 +37,3 @@ export function clearAuthCookies() {
     Cookies.remove(name, { path: "/", secure: false });
   }
 }
-
-export function missingUserMessage(data: unknown) {
-  if (!data || typeof data !== "object") return null;
-  const body = data as { message?: string; error?: { message?: string } };
-  const message = body.error?.message || body.message || "";
-  return /not found/i.test(message) ? message : null;
-}
-
-export function noteStaleAccount(message: string) {
-  try {
-    sessionStorage.setItem("authNotice", message);
-  } catch {
-    // Storage can be unavailable in private mode.
-  }
-}
