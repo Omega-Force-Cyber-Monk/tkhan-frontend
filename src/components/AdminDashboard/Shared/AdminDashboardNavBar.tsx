@@ -1,3 +1,4 @@
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
   Bell,
@@ -10,7 +11,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import userIcon from "@/assets/Logo/usericon.svg";
 import { useDispatch } from "react-redux";
 import { logOut, setProfileImage, useCurrentUser } from "@/redux/features/auth/authSlice";
 import { useAppSelector } from "@/redux/hooks/redux-hook";
@@ -125,7 +125,7 @@ const AdminDashboardNavBar: React.FC<NavbarProps> = ({
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const [profilePic, setProfilePic] = useState<string>(userIcon);
+  const [profilePic, setProfilePic] = useState<string>("");
   const [optimisticReadIds, setOptimisticReadIds] = useState<Set<string>>(
     new Set(),
   );
@@ -149,7 +149,7 @@ const AdminDashboardNavBar: React.FC<NavbarProps> = ({
     savedImage ||
     me?.profileImage ||
     (user?.profileImage?.startsWith("http") ? user.profileImage : null);
-  const profileSrc = profilePic.startsWith("blob:") ? profilePic : accountImage || userIcon;
+  const profileSrc = profilePic.startsWith("blob:") ? profilePic : accountImage || undefined;
 
   useEffect(() => {
     if (savedImage || !me?.profileImage) return;
@@ -540,11 +540,12 @@ const AdminDashboardNavBar: React.FC<NavbarProps> = ({
                 className="relative group cursor-pointer outline-none rounded-full"
               >
                 <div className="relative w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-full border-2 border-white shadow-md overflow-hidden bg-gray-50">
-                  <img
-                    src={profileSrc}
-                    alt="User"
-                    className="w-full h-full object-cover"
-                  />
+                  <Avatar className="w-full h-full">
+                    <AvatarImage src={profileSrc} alt={displayName} className="object-cover" />
+                    <AvatarFallback className="bg-[#FF6B35]/10 text-[#FF6B35] font-bold">
+                      {displayName.trim().charAt(0).toUpperCase() || "A"}
+                    </AvatarFallback>
+                  </Avatar>
                   {isUploadingPic && (
                     <span className="absolute inset-0 flex items-center justify-center bg-black/40">
                       <Loader2 size={16} className="animate-spin text-white" />

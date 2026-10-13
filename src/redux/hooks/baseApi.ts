@@ -28,11 +28,7 @@ interface FailedRequest {
   reject: (error: FetchBaseQueryError | Error) => void;
 }
 
-const baseURL = import.meta.env.VITE_API_ENDPOINT;
-
-if (!baseURL) {
-  throw new Error("VITE_API_ENDPOINT is not defined in environment variables");
-}
+const baseURL = import.meta.env.VITE_API_ENDPOINT?.trim();
 
 const isDev = import.meta.env.DEV;
 
@@ -75,6 +71,16 @@ const baseQueryWithRefreshToken: BaseQueryFn<
   unknown,
   FetchBaseQueryError
 > = async (args, api, extraOptions): Promise<RawBaseQueryResult> => {
+  if (!baseURL) {
+    return {
+      error: {
+        status: "CUSTOM_ERROR",
+        error: "VITE_API_ENDPOINT is not configured",
+        data: { message: "The service is not configured. Please contact support." },
+      },
+    };
+  }
+
   if (isDev) {
     console.log("[API Request]", {
       url: typeof args === "string" ? args : args.url,

@@ -1,3 +1,4 @@
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import React, { useEffect, useState } from "react";
 import {
   LayoutGrid,
@@ -188,15 +189,12 @@ const AdminSidebar: React.FC<SidebarProps> = ({
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-2 sm:gap-3 bg-gray-50/50 p-3 sm:p-4 rounded-2xl">
             <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-[#FF6B35]/10 flex items-center justify-center text-[#FF6B35] text-sm sm:text-base font-bold overflow-hidden border border-[#FF6B35]/20 shrink-0">
-              {avatar ? (
-                <img
-                  src={avatar}
-                  alt={displayName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                displayName.charAt(0)
-              )}
+              <Avatar className="w-full h-full">
+                <AvatarImage src={avatar} alt={displayName} className="object-cover" />
+                <AvatarFallback className="bg-transparent">
+                  {displayName.trim().charAt(0).toUpperCase() || "A"}
+                </AvatarFallback>
+              </Avatar>
             </div>
 
             <div className="overflow-hidden text-left">
