@@ -4,6 +4,7 @@ import NotFound from "../pages/NotFound";
 import Home from "../pages/Home";
 import Signup from "@/pages/Signup";
 import Login from "@/pages/Login"; // ✅
+import OnboardingSuccess from "@/pages/OnboardingSuccess";
 
 import AdminLayout from "@/Layout/AdminLayout";
 
@@ -30,6 +31,10 @@ const routes = createBrowserRouter([
       {
         path: "/login",
         element: <Login />,
+      },
+      {
+        path: "/onboarding-success",
+        element: <OnboardingSuccess />,
       },
     ],
   },
