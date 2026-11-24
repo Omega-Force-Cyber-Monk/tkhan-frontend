@@ -3,7 +3,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 import { PaymentHistoryTable } from "../../components/AdminDashboard/Payment/PaymentHistoryTable";
-import { PaymentDetails } from "../../components/AdminDashboard/Payment/PaymentDetails";
+import {
+  PaymentDetails,
+  refundableAmountOf,
+} from "../../components/AdminDashboard/Payment/PaymentDetails";
+import BookingCancelRefundModal, {
+  CancelRefundMode,
+} from "../../components/AdminDashboard/Payment/BookingCancelRefundModal";
+import { GroomerNoShowsTable } from "../../components/AdminDashboard/Payment/GroomerNoShowsTable";
 import { PlatformPricingTab } from "../../components/AdminDashboard/Payment/PlatformPricing";
 import { PendingPaymentsTable } from "../../components/AdminDashboard/Payment/PendingPaymentsTable";
 import CompletionRejectModal from "../../components/AdminDashboard/Shared/CompletionRejectModal";
@@ -19,9 +26,10 @@ type View =
   | "DETAIL_PENDING"
   | "LIST_HISTORY"
   | "DETAIL_HISTORY"
-  | "PLATFORM_PRICING";
+  | "PLATFORM_PRICING"
+  | "NO_SHOWS";
 
-type ActiveTab = "pending" | "history" | "pricing";
+type ActiveTab = "pending" | "history" | "pricing" | "noShows";
 
 const getAnimationVariants = (isDetailView: boolean) => ({
   initial: isDetailView ? { opacity: 0, x: 20 } : { opacity: 0 },
@@ -33,6 +41,7 @@ const TABS: { key: ActiveTab; label: string; listView: View }[] = [
   { key: "pending", label: "Pending payments", listView: "LIST_PENDING" },
   { key: "history", label: "Payment History", listView: "LIST_HISTORY" },
   { key: "pricing", label: "Platform Pricing", listView: "PLATFORM_PRICING" },
+  { key: "noShows", label: "Groomer No-Shows", listView: "NO_SHOWS" },
 ];
 
 const getErrorMessage = (error: unknown) => {
@@ -52,6 +61,10 @@ export default function PaymentsPage() {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [actingBookingId, setActingBookingId] = useState<string | null>(null);
+  const [cancelRefund, setCancelRefund] = useState<{
+    mode: CancelRefundMode;
+    payment: Payment;
+  } | null>(null);
 
   const [approveCompletion] = useApproveCompletionMutation();
   const [rejectBooking, { isLoading: isRejecting }] =
@@ -171,6 +184,8 @@ export default function PaymentsPage() {
                 )}
 
                 {view === "PLATFORM_PRICING" && <PlatformPricingTab />}
+
+                {view === "NO_SHOWS" && <GroomerNoShowsTable />}
               </>
             )}
 
@@ -181,6 +196,12 @@ export default function PaymentsPage() {
                   setSelectedPayment(null);
                 }}
                 data={selectedPayment}
+                onCancelBooking={(payment) =>
+                  setCancelRefund({ mode: "cancel", payment })
+                }
+                onRefundBooking={(payment) =>
+                  setCancelRefund({ mode: "refund", payment })
+                }
               />
             )}
 
@@ -195,11 +216,33 @@ export default function PaymentsPage() {
                 onAcceptCompletion={handleAccept}
                 onRejectCompletion={(bookingId) => setRejectId(bookingId)}
                 actingId={completionActingId}
+                onCancelBooking={(payment) =>
+                  setCancelRefund({ mode: "cancel", payment })
+                }
+                onRefundBooking={(payment) =>
+                  setCancelRefund({ mode: "refund", payment })
+                }
               />
             )}
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <BookingCancelRefundModal
+        isOpen={Boolean(cancelRefund)}
+        mode={cancelRefund?.mode ?? "cancel"}
+        bookingId={cancelRefund?.payment.booking?.id ?? null}
+        bookingNumber={cancelRefund?.payment.booking?.bookingNumber}
+        refundableAmount={
+          cancelRefund ? refundableAmountOf(cancelRefund.payment) : 0
+        }
+        onClose={() => setCancelRefund(null)}
+        onDone={() => {
+          // The list refetches via cache tags; go back so the admin sees fresh data.
+          setSelectedPayment(null);
+          setView(activeTab === "history" ? "LIST_HISTORY" : "LIST_PENDING");
+        }}
+      />
 
       <CompletionRejectModal
         isOpen={Boolean(rejectId)}

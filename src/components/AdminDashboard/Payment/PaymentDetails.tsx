@@ -9,9 +9,33 @@ interface PaymentDetailsProps {
   onRejectCompletion?: (bookingId: string) => void;
   actingId?: string | null;
   showCompletionActions?: boolean;
+  onCancelBooking?: (payment: Payment) => void;
+  onRefundBooking?: (payment: Payment) => void;
 }
 
-type PaymentStatus = "SUCCEEDED" | "PENDING" | "FAILED" | "REFUNDED";
+type PaymentStatus =
+  | "SUCCEEDED"
+  | "PENDING"
+  | "FAILED"
+  | "REFUNDED"
+  | "PARTIALLY_REFUNDED"
+  | "COMPLETED";
+
+const CANCELLABLE_BOOKING_STATUSES = [
+  "PAYMENT_PENDING",
+  "PENDING",
+  "REQUESTED",
+  "ACCEPTED",
+  "IN_PROGRESS",
+  "COMPLETION_REQUESTED",
+];
+
+export const refundableAmountOf = (payment: Payment) => {
+  if (!["SUCCEEDED", "PARTIALLY_REFUNDED"].includes(payment.status)) return 0;
+  const paid = parseFloat(payment.amount) || 0;
+  const refunded = parseFloat(payment.refundedAmount ?? "0") || 0;
+  return Math.max(Math.round((paid - refunded) * 100) / 100, 0);
+};
 
 interface StatusStyle {
   bg: string;
@@ -24,6 +48,12 @@ const statusConfig: Record<PaymentStatus, StatusStyle> = {
   PENDING: { bg: "bg-amber-100", text: "text-amber-800", label: "Pending" },
   FAILED: { bg: "bg-red-100", text: "text-red-800", label: "Failed" },
   REFUNDED: { bg: "bg-blue-100", text: "text-blue-800", label: "Refunded" },
+  PARTIALLY_REFUNDED: {
+    bg: "bg-indigo-100",
+    text: "text-indigo-800",
+    label: "Partially refunded",
+  },
+  COMPLETED: { bg: "bg-green-100", text: "text-green-800", label: "Completed" },
 };
 
 const convertToNumber = (value: string | number | undefined): number => {
@@ -39,6 +69,8 @@ export const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   onRejectCompletion,
   actingId,
   showCompletionActions = false,
+  onCancelBooking,
+  onRefundBooking,
 }) => {
   if (!data) {
     return (
@@ -58,6 +90,12 @@ export const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     statusConfig[data.status as PaymentStatus] ?? statusConfig["PENDING"];
   const numericAmount = convertToNumber(data.amount);
   const booking = data.booking;
+  const refundable = refundableAmountOf(data);
+  const canCancel =
+    Boolean(booking) && CANCELLABLE_BOOKING_STATUSES.includes(booking.status);
+  const canRefund =
+    refundable > 0 && Boolean(booking) && booking.status !== "COMPLETED";
+  const refundedSoFar = convertToNumber(data.refundedAmount ?? undefined);
 
   return (
     <motion.div
@@ -113,7 +151,7 @@ export const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             <div className="px-6 py-6">
               <p className="text-[11px] text-[#9CA3AF] mb-1.5">Amount</p>
               <p className="text-[34px] font-bold text-[#111827] tracking-tight">
-                ${numericAmount.toFixed(0)}
+                ${numericAmount.toFixed(2)}
               </p>
             </div>
 
@@ -154,6 +192,73 @@ export const PaymentDetails: React.FC<PaymentDetailsProps> = ({
               </div>
             </div>
           </div>
+
+          <div className="bg-[#F9FAFB] rounded-xl border border-[#F3F4F6] px-6 py-5 grid grid-cols-2 gap-x-8 gap-y-5">
+            <div>
+              <p className="text-[11px] text-[#9CA3AF] mb-1">Booking status</p>
+              <p className="text-[13px] font-medium text-[#111827]">
+                {booking?.status ?? "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-[#9CA3AF] mb-1">Refunded</p>
+              <p className="text-[13px] font-medium text-[#111827]">
+                ${refundedSoFar.toFixed(2)}
+                {booking?.refundPercent != null &&
+                  ` (${booking.refundPercent}%)`}
+              </p>
+            </div>
+            {booking?.cancelledAt && (
+              <>
+                <div>
+                  <p className="text-[11px] text-[#9CA3AF] mb-1">
+                    Cancelled by
+                  </p>
+                  <p className="text-[13px] font-medium text-[#111827]">
+                    {booking.cancelledBy ?? "—"}
+                    {booking.isLateCancellation ? " (late)" : ""}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-[#9CA3AF] mb-1">
+                    Late fee kept
+                  </p>
+                  <p className="text-[13px] font-medium text-[#111827]">
+                    ${convertToNumber(booking.lateFeeAmount ?? undefined).toFixed(2)}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-[11px] text-[#9CA3AF] mb-1">
+                    Cancellation reason
+                  </p>
+                  <p className="text-[13px] text-[#111827]">
+                    {booking.cancellationReason || "—"}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {(canCancel || canRefund) && (onCancelBooking || onRefundBooking) && (
+            <div className="flex flex-wrap items-center gap-3">
+              {canCancel && onCancelBooking && (
+                <button
+                  onClick={() => onCancelBooking(data)}
+                  className="px-4 py-2 rounded-lg border border-red-200 text-red-700 text-[13px] font-medium hover:bg-red-50 cursor-pointer"
+                >
+                  Cancel booking
+                </button>
+              )}
+              {canRefund && onRefundBooking && (
+                <button
+                  onClick={() => onRefundBooking(data)}
+                  className="px-4 py-2 rounded-lg border border-[#FFD3C2] text-[#E8551E] text-[13px] font-medium hover:bg-[#FFF5F0] cursor-pointer"
+                >
+                  Issue refund (${refundable.toFixed(2)} available)
+                </button>
+              )}
+            </div>
+          )}
 
           {(booking?.beforeImage ||
             booking?.afterImage ||
