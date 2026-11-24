@@ -5,6 +5,7 @@ export type PaymentStatus =
     | "PENDING"
     | "FAILED"
     | "REFUNDED"
+    | "PARTIALLY_REFUNDED"
     | string;
 
 export interface PaymentBooking {
@@ -35,6 +36,12 @@ export interface PaymentBooking {
     refundedAt: string | null;
     rejectionReason: string | null;
     cancellationReason: string | null;
+    cancelledBy?: "BUYER" | "GROOMER" | "ADMIN" | "SYSTEM" | null;
+    isLateCancellation?: boolean;
+    refundPercent?: number | null;
+    refundAmount?: string | null;
+    lateFeeAmount?: string | null;
+    termsAcceptedAt?: string | null;
     completionNote: string | null;
     beforeImage: string | null;
     afterImage: string | null;
@@ -51,6 +58,7 @@ export interface Payment {
     stripeCheckoutSessionId: string | null;
     stripePaymentIntentId: string | null;
     stripeRefundId: string | null;
+    refundedAmount?: string | null;
     failureReason: string | null;
     paidAt: string | null;
     refundedAt: string | null;

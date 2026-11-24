@@ -24,3 +24,6 @@ dist-ssr
 .vercel
 .node_modules
 config.bat
+
+# local env files
+.env
